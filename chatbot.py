@@ -34,7 +34,10 @@ def get_config(section: str, key: str, fallback: str = None) -> str:
         config = configparser.ConfigParser()
         config.read("config.ini")
         get_config.config = config
-    return get_config.config.get(section, key, fallback=fallback)
+    result = get_config.config.get(section, key, fallback=fallback)
+    if result is None:
+        raise ValueError(f"Configuration for {key} is missing!")
+    return result
 
 # /add 命令
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
