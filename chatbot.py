@@ -28,6 +28,7 @@ global chatgpt
 # 获取配置函数：优先使用环境变量，其次读取 config.ini
 def get_config(section: str, key: str, fallback: str = None) -> str:
     value = os.getenv(key)
+    logger.info(f"Environment variable for {key}: {value}")  # 打印环境变量
     if value:
         return value
     if not hasattr(get_config, "config"):
@@ -83,14 +84,6 @@ async def equiped_chatgpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 主入口
 def main():
-
-    # 调试输出环境变量
-    telegram_token = os.getenv("TELEGRAM_TOKEN")
-    if telegram_token:
-        logger.info(f"Telegram Token loaded successfully: {telegram_token[:5]}...")  # 显示部分token，避免暴露完整token
-    else:
-        logger.error("❌ TELEGRAM_TOKEN is not set!")
-        raise ValueError("TELEGRAM_TOKEN is missing!")
 
     # 初始化 Firestore
     try:
