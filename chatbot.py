@@ -27,18 +27,27 @@ global chatgpt
 
 # 获取配置函数：优先使用环境变量，其次读取 config.ini
 def get_config(section: str, key: str, fallback: str = None) -> str:
-    value = os.getenv(key)
-    logger.info(f"Environment variable for {key}: {value}")  # 打印环境变量
+    # 1. 优先尝试从环境变量读取（格式：SECTION_KEY）
+    env_name = f"{section}_{key}".upper()
+    value = os.getenv(env_name)
     if value:
         return value
+
+    # 2. 如果环境变量不存在，尝试直接读取 KEY（兼容旧版环境变量，如 ACCESS_TOKEN）
+    value = os.getenv(key.upper())
+    if value:
+        return value
+
+    # 3. 最后回退到 config.ini
     if not hasattr(get_config, "config"):
-        config = configparser.ConfigParser()
-        config.read("config.ini")
-        get_config.config = config
-    result = get_config.config.get(section, key, fallback=fallback)
-    if result is None:
-        raise ValueError(f"Configuration for {key} is missing!")
-    return result
+        get_config.config = configparser.ConfigParser()
+        get_config.config.read("config.ini")
+    try:
+        return get_config.config.get(section, key, fallback=fallback)
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        if fallback is not None:
+            return fallback
+        raise ValueError(f"Missing config: {section}.{key}")
 
 # /add 命令
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
