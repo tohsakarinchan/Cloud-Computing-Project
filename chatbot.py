@@ -83,6 +83,15 @@ async def equiped_chatgpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 主入口
 def main():
+
+    # 调试输出环境变量
+    telegram_token = os.getenv("TELEGRAM_TOKEN")
+    if telegram_token:
+        logger.info(f"Telegram Token loaded successfully: {telegram_token[:5]}...")  # 显示部分token，避免暴露完整token
+    else:
+        logger.error("❌ TELEGRAM_TOKEN is not set!")
+        raise ValueError("TELEGRAM_TOKEN is missing!")
+
     # 初始化 Firestore
     try:
         firebase_config = os.getenv("FIREBASE_CONFIG")
