@@ -57,6 +57,22 @@ class HKBU_ChatGPT:
         except Exception as e:
             print(f"❌ Firestore 写入失败: {e}")
 
+    def save_event_to_firestore(self, event_data):
+        """
+        保存活动信息到 Firestore
+        event_data 是一个字典，包含活动的详细信息
+        """
+        if not self.firestore_db:
+            print("❗ Firestore 数据库未初始化，跳过活动写入。")
+            return
+
+        try:
+            event_ref = self.firestore_db.collection("events").document()
+            event_ref.set(event_data)
+            print("✅ 活动数据写入成功！")
+        except Exception as e:
+            print(f"❌ 活动数据写入失败: {e}")
+
     def try_fetch_vvquest_image(self, query, n=1):
         try:
             resp = requests.get("https://api.zvv.quest/search", params={"q": query, "n": n})
@@ -75,11 +91,32 @@ class HKBU_ChatGPT:
         """
         recommendations = []
 
-        # 基于 ChatGPT 分析对话内容来决定推荐
-        prompt = f"从以下对话内容中提取出用户的兴趣爱好并生成推荐活动或资源：\n'{message}'"
-        recommendations = self.ask_chatgpt_for_recommendations(prompt)
+        # 先从 Firestore 中获取活动信息
+        events = self.fetch_events_from_firestore(message)
+
+        # 如果没有找到合适的活动，再调用 ChatGPT 来生成推荐内容
+        if not events:
+            prompt = f"从以下对话内容中提取出用户的兴趣爱好并生成推荐活动或资源：\n'{message}'"
+            recommendations = self.ask_chatgpt_for_recommendations(prompt)
+        else:
+            recommendations = events
 
         return recommendations
+
+    def fetch_events_from_firestore(self, message):
+        """
+        从 Firestore 中检索与用户消息相关的活动。
+        """
+        events_ref = self.firestore_db.collection("events")
+        query = events_ref.where("keywords", "array_contains", message)
+        docs = query.stream()
+
+        events = []
+        for doc in docs:
+            event = doc.to_dict()
+            events.append(event)
+        
+        return events
 
     def ask_chatgpt_for_recommendations(self, prompt):
         """
