@@ -111,6 +111,9 @@ class HKBU_ChatGPT:
                     if images:
                         return {"text": content, "image_url": images[0]}
 
+                # 输出完整对话日志
+                self.print_conversation_log(user_id)
+
                 return {"text": content}
 
             else:
@@ -118,3 +121,12 @@ class HKBU_ChatGPT:
 
         except Exception as e:
             return {"text": f"Error: {str(e)}"}
+
+    def print_conversation_log(self, user_id):
+        """输出完整对话日志"""
+        if user_id in self.memory:
+            print(f"User {user_id} 对话日志:")
+            for msg in self.memory[user_id]:
+                print(f"{msg['role'].capitalize()}: {msg['content']}")
+        else:
+            print(f"User {user_id} 暂无对话记录。")
