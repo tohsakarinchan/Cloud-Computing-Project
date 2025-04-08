@@ -5,7 +5,7 @@ import configparser
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-from flask import Flask, request
+from quart import Quart, request
 import asyncio
 
 from telegram import Update
@@ -19,8 +19,8 @@ from telegram.ext import (
 
 from ChatGPT_HKBU import HKBU_ChatGPT
 
-# 初始化 Flask 应用
-app = Flask(__name__)
+# 初始化 Quart 应用
+app = Quart(__name__)
 telegram_app = None  # 全局 Telegram 应用
 chatgpt = None
 db = None
@@ -31,7 +31,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
-
 
 # 配置读取函数
 def get_config(section: str, key: str, fallback: str = None) -> str:
@@ -92,19 +91,16 @@ async def equiped_chatgpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === Webhook 端点 ===
 @app.route("/")
-def health_check():
+async def health_check():
     return "🤖 Bot is running on Webhook!", 200
 
 @app.route("/webhook", methods=["POST"])
-def telegram_webhook():
-    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
+async def telegram_webhook():
+    update = Update.de_json(await request.get_json(), telegram_app.bot)
 
-    async def handle_update():
-        if not telegram_app._initialized:  # ✅ 避免重复初始化
-            await telegram_app.initialize()
-        await telegram_app.process_update(update)
-
-    asyncio.run(handle_update())
+    if not telegram_app._initialized:
+        await telegram_app.initialize()
+    await telegram_app.process_update(update)
     return "ok", 200
 
 
