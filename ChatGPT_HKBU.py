@@ -57,7 +57,6 @@ class HKBU_ChatGPT:
         except Exception as e:
             print(f"❌ Firestore 写入失败: {e}")
 
-
     def try_fetch_vvquest_image(self, query, n=1):
         try:
             resp = requests.get("https://api.zvv.quest/search", params={"q": query, "n": n})
