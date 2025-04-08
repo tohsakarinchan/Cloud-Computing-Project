@@ -1,6 +1,7 @@
 import configparser
 import requests
 import os
+import random
 from collections import defaultdict, deque
 from google.cloud import firestore
 from google.cloud.firestore_v1 import SERVER_TIMESTAMP
@@ -23,33 +24,51 @@ class HKBU_ChatGPT:
             "不要太客气，也不要太机械。尽可能展现出你的个性和情绪。"
         )
 
-        # memory 只缓存最新 5 条上下文（role+message）
         self.memory = defaultdict(lambda: deque(maxlen=5))
         self.firestore_db = firestore_db
 
     def load_history_from_firestore(self, user_id, limit=5):
-        """从 Firestore 加载历史对话"""
         context_ref = self.firestore_db.collection("chat_history").document(str(user_id)).collection("messages")
         query = context_ref.order_by("timestamp", direction=firestore.Query.DESCENDING).limit(limit)
         docs = query.stream()
 
         history = []
-        for doc in reversed(list(docs)):  # 倒序恢复为正序
+        for doc in reversed(list(docs)):
             data = doc.to_dict()
-            role = data.get("role", "user")
-            content = data.get("content", "")
-            history.append({"role": role, "content": content})
+            history.append({"role": data.get("role", "user"), "content": data.get("content", "")})
         
         return history
 
     def save_message_to_firestore(self, user_id, role, content):
-        """将单条消息保存到 Firestore（新结构）"""
         msg_ref = self.firestore_db.collection("chat_history").document(str(user_id)).collection("messages").document()
         msg_ref.set({
             "role": role,
             "content": content,
             "timestamp": SERVER_TIMESTAMP,
         })
+
+    def fetch_emoji_image(self, query, count=3):
+        """调用 VVQuest 表情包 API 返回图片 URL 列表"""
+        try:
+            resp = requests.get("https://api.zvv.quest/search", params={"q": query, "n": count})
+            if resp.status_code == 200:
+                data = resp.json()
+                if data["code"] == 200 and data["data"]:
+                    return data["data"]
+            return []
+        except Exception as e:
+            print(f"⚠️ 表情包接口调用失败: {e}")
+            return []
+
+    def maybe_insert_emoji(self, content, user_msg):
+        """有几率插入表情包"""
+        chance = 0.4  # 40% 几率插入表情包
+        if random.random() < chance:
+            keyword = user_msg.strip().split()[0] if user_msg.strip() else "搞笑"
+            images = self.fetch_emoji_image(keyword)
+            if images:
+                return f"{content}\n\n[表情包]({images[0]})"
+        return content
 
     def submit(self, message, user_id=None):
         try:
@@ -62,7 +81,6 @@ class HKBU_ChatGPT:
             if not user_id:
                 user_id = "anonymous"
 
-            # 如果是第一次对话，尝试加载历史
             if user_id not in self.memory:
                 self.memory[user_id] = deque(maxlen=5)
                 try:
@@ -73,7 +91,6 @@ class HKBU_ChatGPT:
                 except Exception as e:
                     print(f"⚠️ Firestore 加载失败: {e}")
 
-            # 构造消息历史
             messages = [{"role": "system", "content": self.system_prompt}]
             messages.extend(self.memory[user_id])
             messages.append({"role": "user", "content": message})
@@ -84,16 +101,17 @@ class HKBU_ChatGPT:
             if response.status_code == 200:
                 content = response.json().get('choices', [{}])[0].get('message', {}).get('content', "No response")
 
-                # 保存到内存
-                self.memory[user_id].append({"role": "user", "content": message})
-                self.memory[user_id].append({"role": "assistant", "content": content})
+                # 插入表情包
+                content_with_emoji = self.maybe_insert_emoji(content, message)
 
-                # 保存到 Firestore
+                self.memory[user_id].append({"role": "user", "content": message})
+                self.memory[user_id].append({"role": "assistant", "content": content_with_emoji})
+
                 if self.firestore_db:
                     self.save_message_to_firestore(user_id, "user", message)
-                    self.save_message_to_firestore(user_id, "assistant", content)
+                    self.save_message_to_firestore(user_id, "assistant", content_with_emoji)
 
-                return content
+                return content_with_emoji
             else:
                 return f"Error: API request failed (Status Code: {response.status_code})"
 
