@@ -62,7 +62,7 @@ def get_config(section: str, key: str, fallback: str = None) -> str:
 
 def get_maimai_player_profile(player_id: str) -> dict:
     token = os.getenv("MAIMAI_PERSONAL_TOKEN")
-    url = f"https://www.diving-fish.com/api/maimaidxprober/player/profile"
+    url = f"https://maimai.lxns.net/api/v0/player/"
     params = {"player_id": player_id, "token": token}
     
     try:
