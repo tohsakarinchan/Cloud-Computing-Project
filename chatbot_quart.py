@@ -102,7 +102,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/add <keyword> - Count keyword usage\n"
         "/help - Show help\n"
         "/hello <name> - Greet a user\n"
-        "/maimai <player_id> - 查询舞萌 DX 玩家资料"
+        "/maimai <player_id> - 查询舞萌 DX 玩家资料(开发中)"
     )
 
 async def hello_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
