@@ -1,40 +1,20 @@
-# 使用官方 Python 轻量镜像（兼容 Cloud Run）
-FROM python:3.9-slim as builder
+# 使用官方 Python 运行时作为父镜像
+FROM python:3.9
 
-# 安装编译依赖（如需）
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc python3-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
-
-# --- 运行时阶段 ---
-FROM python:3.9-slim
-
-# 设置非 root 用户（GCP 非强制但推荐）
-RUN useradd -m appuser && \
-    mkdir -p /app && \
-    chown appuser:appuser /app
-USER appuser
+# 设置工作目录
 WORKDIR /app
 
-# 从 builder 复制已安装的依赖
-COPY --from=builder /home/appuser/.local /home/appuser/.local
-COPY --chown=appuser:appuser . .
+# 复制依赖文件
+COPY requirements.txt ./
 
-# 确保 PATH 包含用户级 pip 安装路径
-ENV PATH=/home/appuser/.local/bin:$PATH \
-    PYTHONUNBUFFERED=1 \
-    PORT=8080 
+# 安装依赖
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 暴露端口（与 Cloud Run 的 $PORT 一致）
-EXPOSE $PORT
+# 复制项目文件
+COPY . .
 
-# 健康检查（Cloud Run 自动监控）
-HEALTHCHECK --interval=30s --timeout=5s \
-  CMD curl -f http://localhost:$PORT/ || exit 1
+# 默认端口（Cloud Run 默认监听 8080）
+EXPOSE 8080
 
-# 启动命令（确保您的 Quart 应用监听 $PORT）
+# 启动命令
 CMD ["python", "chatbot_quart.py"]
