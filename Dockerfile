@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 8080
 
 # 启动命令
-CMD ["python", "chatbot_webhook.py"]
+CMD ["python", "chatbot_quart.py"]
