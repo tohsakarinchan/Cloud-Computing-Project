@@ -18,6 +18,7 @@ from telegram.ext import (
 )
 
 from ChatGPT_HKBU import HKBU_ChatGPT
+import requests
 
 # 初始化 Quart 应用
 app = Quart(__name__)
@@ -50,6 +51,21 @@ def get_config(section: str, key: str, fallback: str = None) -> str:
             return fallback
         raise ValueError(f"Missing config: {section}.{key}")
 
+# === 获取舞萌 DX 玩家资料 ===
+def get_maimai_player_profile(player_id: str) -> dict:
+    """ 调用舞萌 API 获取玩家资料 """
+    token = os.getenv("MAIMAI_PERSONAL_TOKEN")  # 从环境变量获取个人 Token
+    url = f"https://www.diving-fish.com/api/maimaidxprober/player/profile"
+    params = {
+        "player_id": player_id,
+        "token": token,
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {"error": "无法获取玩家资料"}
+
 # === 命令处理器 ===
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -64,12 +80,30 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error in /add: {str(e)}")
         await update.message.reply_text("An error occurred.")
 
+# 新增 /maimai 命令处理器
+async def maimai_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.args:
+        player_id = context.args[0]  # 获取玩家ID
+        profile = get_maimai_player_profile(player_id)
+        if "error" in profile:
+            await update.message.reply_text(profile["error"])
+        else:
+            # 格式化并发送玩家资料
+            profile_text = f"玩家 ID: {profile['player_id']}\n"
+            profile_text += f"昵称: {profile['nickname']}\n"
+            profile_text += f"等级: {profile['level']}\n"
+            # 添加更多字段根据需要
+            await update.message.reply_text(profile_text)
+    else:
+        await update.message.reply_text("请提供玩家 ID，例如：/maimai 玩家123")
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Available commands:\n"
         "/add <keyword> - Count keyword usage\n"
         "/help - Show help\n"
-        "/hello <name> - Greet a user"
+        "/hello <name> - Greet a user\n"
+        "/maimai <player_id> - 查询舞萌 DX 玩家资料"
     )
 
 async def hello_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -145,6 +179,7 @@ def main():
     telegram_app.add_handler(CommandHandler("add", add))
     telegram_app.add_handler(CommandHandler("help", help_command))
     telegram_app.add_handler(CommandHandler("hello", hello_command))
+    telegram_app.add_handler(CommandHandler("maimai", maimai_command))  # 添加 /maimai 命令
     telegram_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), equiped_chatgpt))
 
     # 设置 Webhook
