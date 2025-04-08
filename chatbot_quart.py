@@ -82,11 +82,21 @@ async def equiped_chatgpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user_message = update.message.text
         user_id = update.effective_user.id  # 提取用户 ID
-        reply_message = chatgpt.submit(user_message, user_id=user_id)
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+        reply = chatgpt.submit(user_message, user_id=user_id)
+
+        if isinstance(reply, dict):
+            # 先发文本
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=reply["text"])
+            # 如果有图，就发图
+            if "image_url" in reply:
+                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=reply["image_url"])
+        else:
+            # 回退兼容
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=str(reply))
+
     except Exception as e:
         logger.error(f"ChatGPT Error: {str(e)}")
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Error responding.")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="⚠️ Error responding.")
 
 # === Webhook 端点 ===
 @app.route("/")

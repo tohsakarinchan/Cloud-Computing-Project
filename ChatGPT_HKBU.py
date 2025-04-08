@@ -35,8 +35,10 @@ class HKBU_ChatGPT:
         history = []
         for doc in reversed(list(docs)):
             data = doc.to_dict()
-            history.append({"role": data.get("role", "user"), "content": data.get("content", "")})
-        
+            history.append({
+                "role": data.get("role", "user"),
+                "content": data.get("content", "")
+            })
         return history
 
     def save_message_to_firestore(self, user_id, role, content):
@@ -47,28 +49,16 @@ class HKBU_ChatGPT:
             "timestamp": SERVER_TIMESTAMP,
         })
 
-    def fetch_emoji_image(self, query, count=3):
-        """调用 VVQuest 表情包 API 返回图片 URL 列表"""
+    def try_fetch_vvquest_image(self, query, n=1):
         try:
-            resp = requests.get("https://api.zvv.quest/search", params={"q": query, "n": count})
+            resp = requests.get("https://api.zvv.quest/search", params={"q": query, "n": n})
             if resp.status_code == 200:
-                data = resp.json()
-                if data["code"] == 200 and data["data"]:
-                    return data["data"]
-            return []
+                json_data = resp.json()
+                if json_data.get("code") == 200 and json_data.get("data"):
+                    return json_data["data"]
         except Exception as e:
-            print(f"⚠️ 表情包接口调用失败: {e}")
-            return []
-
-    def maybe_insert_emoji(self, content, user_msg):
-        """有几率插入表情包"""
-        chance = 0.4  # 40% 几率插入表情包
-        if random.random() < chance:
-            keyword = user_msg.strip().split()[0] if user_msg.strip() else "搞笑"
-            images = self.fetch_emoji_image(keyword)
-            if images:
-                return f"{content}\n\n[表情包]({images[0]})"
-        return content
+            print(f"⚠️ VVQuest API Error: {e}")
+        return []
 
     def submit(self, message, user_id=None):
         try:
@@ -87,7 +77,6 @@ class HKBU_ChatGPT:
                     past = self.load_history_from_firestore(user_id, limit=5)
                     for msg in past:
                         self.memory[user_id].append(msg)
-                    print(f"📦 恢复了用户 {user_id} 的历史 {len(past)} 条记录")
                 except Exception as e:
                     print(f"⚠️ Firestore 加载失败: {e}")
 
@@ -101,19 +90,23 @@ class HKBU_ChatGPT:
             if response.status_code == 200:
                 content = response.json().get('choices', [{}])[0].get('message', {}).get('content', "No response")
 
-                # 插入表情包
-                content_with_emoji = self.maybe_insert_emoji(content, message)
-
                 self.memory[user_id].append({"role": "user", "content": message})
-                self.memory[user_id].append({"role": "assistant", "content": content_with_emoji})
+                self.memory[user_id].append({"role": "assistant", "content": content})
 
                 if self.firestore_db:
                     self.save_message_to_firestore(user_id, "user", message)
-                    self.save_message_to_firestore(user_id, "assistant", content_with_emoji)
+                    self.save_message_to_firestore(user_id, "assistant", content)
 
-                return content_with_emoji
+                # 60% 概率加入表情包图
+                if random.random() < 0.6:
+                    images = self.try_fetch_vvquest_image(query=message, n=1)
+                    if images:
+                        return {"text": content, "image_url": images[0]}
+
+                return {"text": content}
+
             else:
-                return f"Error: API request failed (Status Code: {response.status_code})"
+                return {"text": f"Error: API request failed (Status Code: {response.status_code})"}
 
         except Exception as e:
-            return f"Error: {str(e)}"
+            return {"text": f"Error: {str(e)}"}
