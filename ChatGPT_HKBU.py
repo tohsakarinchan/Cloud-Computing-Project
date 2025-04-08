@@ -68,6 +68,44 @@ class HKBU_ChatGPT:
             print(f"⚠️ VVQuest API Error: {e}")
         return []
 
+    def generate_dynamic_recommendations(self, message):
+        """
+        基于用户输入的消息生成动态的推荐内容。
+        例如，通过 ChatGPT 识别意图，结合上下文智能推荐。
+        """
+        recommendations = []
+
+        # 基于 ChatGPT 分析对话内容来决定推荐
+        prompt = f"从以下对话内容中提取出用户的兴趣爱好并生成推荐活动或资源：\n'{message}'"
+        recommendations = self.ask_chatgpt_for_recommendations(prompt)
+
+        return recommendations
+
+    def ask_chatgpt_for_recommendations(self, prompt):
+        """
+        询问 ChatGPT 生成推荐活动或资源。
+        """
+        url = f"{self.base_url}/deployments/{self.model}/completions/?api-version={self.api_version}"
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": self.access_token
+        }
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "max_tokens": 150
+        }
+
+        try:
+            response = requests.post(url, json=payload, headers=headers)
+            if response.status_code == 200:
+                return response.json().get('choices', [{}])[0].get('text', "").split("\n")
+            else:
+                return ["Error in generating recommendations."]
+        except Exception as e:
+            print(f"⚠️ Error in generating recommendations: {e}")
+            return ["Error in generating recommendations."]
+
     def submit(self, message, user_id=None):
         try:
             url = f"{self.base_url}/deployments/{self.model}/chat/completions/?api-version={self.api_version}"
@@ -110,6 +148,11 @@ class HKBU_ChatGPT:
                     images = self.try_fetch_vvquest_image(query=message, n=1)
                     if images:
                         return {"text": content, "image_url": images[0]}
+
+                # 动态推荐内容
+                dynamic_recommendations = self.generate_dynamic_recommendations(message)
+
+                return {"text": content, "recommendations": dynamic_recommendations}
 
                 # 输出完整对话日志
                 self.print_conversation_log(user_id)
