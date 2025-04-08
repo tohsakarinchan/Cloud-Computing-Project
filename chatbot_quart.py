@@ -55,10 +55,9 @@ def get_config(section: str, key: str, fallback: str = None) -> str:
 def get_maimai_player_profile(player_id: str) -> dict:
     """ 调用舞萌 API 获取玩家资料 """
     token = os.getenv("MAIMAI_PERSONAL_TOKEN")  # 从环境变量获取个人 Token
-    url = f"https://www.diving-fish.com/api/maimaidxprober/player/profile"
+    url = f"https://maimai.lxns.net/api/v0/user/maimai/player"
     params = {
-        "player_id": player_id,
-        "token": token,
+        "X-User-Token": token,
     }
     response = requests.get(url, params=params)
     if response.status_code == 200:
