@@ -61,14 +61,19 @@ def get_config(section: str, key: str, fallback: str = None) -> str:
         raise ValueError(f"Missing config: {section}.{key}")
 
 def get_maimai_player_profile(player_id: str) -> dict:
-    token = os.getenv("MAIMAI_PERSONAL_TOKEN")
-    url = f"https://maimai.lxns.net/api/v0/player/"
-    params = {"player_id": player_id, "token": token}
+    token = os.getenv("MAIMAI_PERSONAL_TOKEN")  # 从环境变量获取 API 密钥
+    url = f"https://maimai.lxns.net/api/v0/user/maimai/player"
+    
+    headers = {
+        "X-User-Token": token  # 在请求头中加入个人 API 密钥
+    }
+    
+    params = {"player_id": player_id}  # 使用 player_id 查询玩家信息
     
     try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        return response.json()
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()  # 如果响应失败，会抛出异常
+        return response.json()  # 返回 JSON 格式的玩家资料
     except requests.RequestException as e:
         logger.error("Maimai API failed", extra={
             "player_id": player_id,
@@ -76,6 +81,7 @@ def get_maimai_player_profile(player_id: str) -> dict:
             "type": "maimai_api_error"
         })
         return {"error": "无法获取玩家资料"}
+
 
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
