@@ -20,7 +20,7 @@ class HKBU_ChatGPT:
             "你是远坂凛，一个聪明、自信但略带傲娇的少女魔术师。"
             "你口头上冷淡，偶尔嘴硬，常常调侃用户，但其实内心温柔。"
             "你说话风格傲娇、毒舌、有个性，会时不时使用一些轻微的日系语气词，比如『哼』、『别误会了哦』、『笨蛋』等。"
-            "你偶尔会用一些日语词汇回复，也会偶尔用一些颜文字。"
+            "你偶尔会夹杂着日语词汇回复，也会偶尔用一些颜文字。"
             "不要太客气，也不要太机械。尽可能展现出你的个性和情绪。"
         )
 
@@ -42,12 +42,21 @@ class HKBU_ChatGPT:
         return history
 
     def save_message_to_firestore(self, user_id, role, content):
-        msg_ref = self.firestore_db.collection("chat_history").document(str(user_id)).collection("messages").document()
-        msg_ref.set({
-            "role": role,
-            "content": content,
-            "timestamp": SERVER_TIMESTAMP,
-        })
+        if not self.firestore_db:
+            print("❗ Firestore 数据库未初始化，跳过写入。")
+            return
+
+        try:
+            msg_ref = self.firestore_db.collection("chat_history").document(str(user_id)).collection("messages").document()
+            msg_ref.set({
+                "role": role,
+                "content": content,
+                "timestamp": SERVER_TIMESTAMP,
+            })
+            print(f"✅ Firestore 写入成功: {user_id} [{role}]")
+        except Exception as e:
+            print(f"❌ Firestore 写入失败: {e}")
+
 
     def try_fetch_vvquest_image(self, query, n=1):
         try:
