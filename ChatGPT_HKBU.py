@@ -5,6 +5,7 @@ import random
 from collections import defaultdict, deque
 from google.cloud import firestore
 from google.cloud.firestore_v1 import SERVER_TIMESTAMP
+import re
 
 class HKBU_ChatGPT:
     def __init__(self, base_url=None, model=None, api_version=None, access_token=None, config_path='config.ini', firestore_db=None):
@@ -105,17 +106,22 @@ class HKBU_ChatGPT:
 
     def fetch_events_from_firestore(self, message):
         """
-        从 Firestore 中检索与用户消息相关的活动。
+        从 Firestore 中检索与用户消息相关的活动，使用模糊搜索。
         """
         events_ref = self.firestore_db.collection("events")
-        query = events_ref.where("keywords", "array_contains", message)
-        docs = query.stream()
+        query = events_ref.stream()
 
         events = []
-        for doc in docs:
+        for doc in query:
             event = doc.to_dict()
-            events.append(event)
-        
+            event_keywords = event.get("keywords", [])
+
+            # 使用正则表达式进行模糊匹配
+            for keyword in event_keywords:
+                if re.search(message, keyword, re.IGNORECASE):  # 匹配时忽略大小写
+                    events.append(event)
+                    break  # 找到匹配项后跳出内层循环
+
         return events
 
     def ask_chatgpt_for_recommendations(self, prompt):
