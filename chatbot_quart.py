@@ -50,7 +50,6 @@ def get_config(section: str, key: str, fallback: str = None) -> str:
             return fallback
         raise ValueError(f"Missing config: {section}.{key}")
 
-
 # === 命令处理器 ===
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -82,12 +81,12 @@ async def hello_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def equiped_chatgpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user_message = update.message.text
-        reply_message = chatgpt.submit(user_message)
+        user_id = update.effective_user.id  # 提取用户 ID
+        reply_message = chatgpt.submit(user_message, user_id=user_id)
         await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
     except Exception as e:
         logger.error(f"ChatGPT Error: {str(e)}")
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Error responding.")
-
 
 # === Webhook 端点 ===
 @app.route("/")
@@ -102,7 +101,6 @@ async def telegram_webhook():
         await telegram_app.initialize()
     await telegram_app.process_update(update)
     return "ok", 200
-
 
 # === 主函数：初始化服务 ===
 def main():
@@ -120,34 +118,34 @@ def main():
     db = firestore.client()
     logger.info("✅ Firestore initialized.")
 
-    # 初始化 ChatGPT
+    # 初始化 ChatGPT，并传入 Firestore 数据库
     chatgpt = HKBU_ChatGPT(
         base_url=get_config("CHATGPT", "BASTCURL"),
         model=get_config("CHATGPT", "MODELNAME"),
         api_version=get_config("CHATGPT", "APIVERSION"),
         access_token=get_config("CHATGPT", "ACCESS_TOKEN"),
+        firestore_db=db,
     )
 
     # 初始化 Telegram Bot
     token = get_config("TELEGRAM", "ACCESS_TOKEN")
     telegram_app = ApplicationBuilder().token(token).build()
 
-    # 添加处理器
+    # 添加指令处理器
     telegram_app.add_handler(CommandHandler("add", add))
     telegram_app.add_handler(CommandHandler("help", help_command))
     telegram_app.add_handler(CommandHandler("hello", hello_command))
     telegram_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), equiped_chatgpt))
 
     # 设置 Webhook
-    webhook_url = os.getenv("WEBHOOK_URL")  # 例如: https://your-service-name.a.run.app/webhook
+    webhook_url = os.getenv("WEBHOOK_URL")
     if webhook_url:
         asyncio.run(telegram_app.bot.set_webhook(webhook_url))
         logger.info(f"🌐 Webhook set to: {webhook_url}")
     else:
         logger.warning("⚠️ WEBHOOK_URL not set!")
 
-
-# === 运行程序 ===
+# === 启动入口 ===
 if __name__ == "__main__":
     main()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
