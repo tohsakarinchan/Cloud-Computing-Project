@@ -98,7 +98,13 @@ def health_check():
 @app.route("/webhook", methods=["POST"])
 def telegram_webhook():
     update = Update.de_json(request.get_json(force=True), telegram_app.bot)
-    asyncio.run(telegram_app.process_update(update))
+
+    async def handle_update():
+        if not telegram_app._initialized:  # ✅ 避免重复初始化
+            await telegram_app.initialize()
+        await telegram_app.process_update(update)
+
+    asyncio.run(handle_update())
     return "ok", 200
 
 
